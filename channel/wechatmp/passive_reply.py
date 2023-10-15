@@ -129,10 +129,8 @@ class Query:
                 if from_user not in channel.cache_dict and from_user not in channel.running:
                     return "success"
 
-                logger.info(f"cache dict {channel.cache_dict[from_user]}  {channel.cache_dict[from_user] == True}")
                 while channel.cache_dict[from_user]:
                     try:
-                        logger.info("pop cache")
                         (reply_type, reply_content) = channel.cache_dict[from_user].pop(0)
                         if not channel.cache_dict[from_user]:  # If popping the message makes the list empty, delete the user entry from cache
                             del channel.cache_dict[from_user]
@@ -164,7 +162,8 @@ class Query:
                             )
                         )
                         replyPost = create_reply(reply_text, msg)
-                        encrypt_func(replyPost.render())
+                        reply_message = encrypt_func(replyPost.render())
+                        channel.client.message.send_text(from_user, reply_text)
 
                     elif reply_type == "voice":
                         media_id = reply_content
@@ -180,7 +179,7 @@ class Query:
                         )
                         replyPost = VoiceReply(message=msg)
                         replyPost.media_id = media_id
-                        encrypt_func(replyPost.render())
+                        reply_message = encrypt_func(replyPost.render())
 
                     elif reply_type == "image":
                         media_id = reply_content
@@ -196,7 +195,8 @@ class Query:
                         )
                         replyPost = ImageReply(message=msg)
                         replyPost.media_id = media_id
-                        encrypt_func(replyPost.render())
+                        reply_message = encrypt_func(replyPost.render())
+
 
             elif msg.type == "event":
                 logger.info("[wechatmp] Event {} from {}".format(msg.event, msg.source))
