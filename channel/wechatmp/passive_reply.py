@@ -129,8 +129,10 @@ class Query:
                 if from_user not in channel.cache_dict and from_user not in channel.running:
                     return "success"
 
+                logger.info(f"cache dict {channel.cache_dict[from_user]}  {channel.cache_dict[from_user] == True}")
                 while channel.cache_dict[from_user]:
                     try:
+                        logger.info("pop cache")
                         (reply_type, reply_content) = channel.cache_dict[from_user].pop(0)
                         if not channel.cache_dict[from_user]:  # If popping the message makes the list empty, delete the user entry from cache
                             del channel.cache_dict[from_user]

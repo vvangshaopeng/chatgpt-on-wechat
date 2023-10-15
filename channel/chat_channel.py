@@ -158,6 +158,7 @@ class ChatChannel(Channel):
 
         # 回复用户发送的语音本身转成文字之后的消息
         if user_voice2text_reply and context.type == ContextType.VOICE and conf().get("reply_user_voice_to_text",True):
+            logger.info(f"send user voice to text reply {user_voice2text_reply.content}")
             self._send_reply(context, user_voice2text_reply)
 
         logger.debug("[WX] ready to decorate reply: {}".format(reply))
