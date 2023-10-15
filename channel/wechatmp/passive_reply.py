@@ -129,70 +129,72 @@ class Query:
                 if from_user not in channel.cache_dict and from_user not in channel.running:
                     return "success"
 
-                # Only one request can access to the cached data
-                try:
-                    (reply_type, reply_content) = channel.cache_dict[from_user].pop(0)
-                    if not channel.cache_dict[from_user]:  # If popping the message makes the list empty, delete the user entry from cache
-                        del channel.cache_dict[from_user]
-                except IndexError:
-                    return "success"
+                while channel.cache_dict[from_user]:
+                    try:
+                        (reply_type, reply_content) = channel.cache_dict[from_user].pop(0)
+                        if not channel.cache_dict[from_user]:  # If popping the message makes the list empty, delete the user entry from cache
+                            del channel.cache_dict[from_user]
+                    except IndexError:
+                        return "success"
 
-                if reply_type == "text":
-                    if len(reply_content.encode("utf8")) <= MAX_UTF8_LEN:
-                        reply_text = reply_content
-                    else:
-                        continue_text = "\n【未完待续，回复任意文字以继续】"
-                        splits = split_string_by_utf8_length(
-                            reply_content,
-                            MAX_UTF8_LEN - len(continue_text.encode("utf-8")),
-                            max_split=1,
-                        )
-                        reply_text = splits[0] + continue_text
-                        channel.cache_dict[from_user].append(("text", splits[1]))
+                    if reply_type == "text":
+                        if len(reply_content.encode("utf8")) <= MAX_UTF8_LEN:
+                            reply_text = reply_content
+                        else:
+                            continue_text = "\n【未完待续，回复任意文字以继续】"
+                            splits = split_string_by_utf8_length(
+                                reply_content,
+                                MAX_UTF8_LEN - len(continue_text.encode("utf-8")),
+                                max_split=1,
+                            )
+                            reply_text = splits[0] + continue_text
+                            #插入到头部
+                            channel.cache_dict[from_user].insert(0,("text", splits[1]))
+                            #channel.cache_dict[from_user].append(("text", splits[1]))
 
-                    logger.info(
-                        "[wechatmp] Request {} do send to {} {}: {}\n{}".format(
-                            request_cnt,
-                            from_user,
-                            message_id,
-                            content,
-                            reply_text,
+                        logger.info(
+                            "[wechatmp] Request {} do send to {} {}: {}\n{}".format(
+                                request_cnt,
+                                from_user,
+                                message_id,
+                                content,
+                                reply_text,
+                            )
                         )
-                    )
-                    replyPost = create_reply(reply_text, msg)
-                    return encrypt_func(replyPost.render())
+                        replyPost = create_reply(reply_text, msg)
+                        encrypt_func(replyPost.render())
 
-                elif reply_type == "voice":
-                    media_id = reply_content
-                    asyncio.run_coroutine_threadsafe(channel.delete_media(media_id), channel.delete_media_loop)
-                    logger.info(
-                        "[wechatmp] Request {} do send to {} {}: {} voice media_id {}".format(
-                            request_cnt,
-                            from_user,
-                            message_id,
-                            content,
-                            media_id,
+                    elif reply_type == "voice":
+                        media_id = reply_content
+                        asyncio.run_coroutine_threadsafe(channel.delete_media(media_id), channel.delete_media_loop)
+                        logger.info(
+                            "[wechatmp] Request {} do send to {} {}: {} voice media_id {}".format(
+                                request_cnt,
+                                from_user,
+                                message_id,
+                                content,
+                                media_id,
+                            )
                         )
-                    )
-                    replyPost = VoiceReply(message=msg)
-                    replyPost.media_id = media_id
-                    return encrypt_func(replyPost.render())
+                        replyPost = VoiceReply(message=msg)
+                        replyPost.media_id = media_id
+                        encrypt_func(replyPost.render())
 
-                elif reply_type == "image":
-                    media_id = reply_content
-                    asyncio.run_coroutine_threadsafe(channel.delete_media(media_id), channel.delete_media_loop)
-                    logger.info(
-                        "[wechatmp] Request {} do send to {} {}: {} image media_id {}".format(
-                            request_cnt,
-                            from_user,
-                            message_id,
-                            content,
-                            media_id,
+                    elif reply_type == "image":
+                        media_id = reply_content
+                        asyncio.run_coroutine_threadsafe(channel.delete_media(media_id), channel.delete_media_loop)
+                        logger.info(
+                            "[wechatmp] Request {} do send to {} {}: {} image media_id {}".format(
+                                request_cnt,
+                                from_user,
+                                message_id,
+                                content,
+                                media_id,
+                            )
                         )
-                    )
-                    replyPost = ImageReply(message=msg)
-                    replyPost.media_id = media_id
-                    return encrypt_func(replyPost.render())
+                        replyPost = ImageReply(message=msg)
+                        replyPost.media_id = media_id
+                        encrypt_func(replyPost.render())
 
             elif msg.type == "event":
                 logger.info("[wechatmp] Event {} from {}".format(msg.event, msg.source))

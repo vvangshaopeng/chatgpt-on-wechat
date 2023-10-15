@@ -1,9 +1,11 @@
+import copy
 import os
 import re
 import threading
 import time
 from asyncio import CancelledError
 from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Tuple
 
 from bridge.context import *
 from bridge.reply import *
@@ -152,7 +154,11 @@ class ChatChannel(Channel):
             return
         logger.debug("[WX] ready to handle context: {}".format(context))
         # reply的构建步骤
-        reply = self._generate_reply(context)
+        reply,user_voice2text_reply = self._generate_reply(context)
+
+        # 回复用户发送的语音本身转成文字之后的消息
+        if user_voice2text_reply and context.type == ContextType.VOICE and conf().get("reply_user_voice_to_text",True):
+            self._send_reply(context, user_voice2text_reply)
 
         logger.debug("[WX] ready to decorate reply: {}".format(reply))
         # reply的包装步骤
@@ -161,7 +167,7 @@ class ChatChannel(Channel):
         # reply的发送步骤
         self._send_reply(context, reply)
 
-    def _generate_reply(self, context: Context, reply: Reply = Reply()) -> Reply:
+    def _generate_reply(self, context: Context, reply: Reply = Reply()) -> Tuple[Reply, Reply]:
         e_context = PluginManager().emit_event(
             EventContext(
                 Event.ON_HANDLE_CONTEXT,
@@ -169,6 +175,7 @@ class ChatChannel(Channel):
             )
         )
         reply = e_context["reply"]
+        user_voice2text_reply = None
         if not e_context.is_pass():
             logger.debug("[WX] ready to handle context: type={}, content={}".format(context.type, context.content))
             if e_context.is_break():
@@ -196,10 +203,13 @@ class ChatChannel(Channel):
                     pass
                     # logger.warning("[WX]delete temp file error: " + str(e))
 
+                user_voice2text_reply = copy.deepcopy(reply)
+                user_voice2text_reply.type = ReplyType.TEXT
+
                 if reply.type == ReplyType.TEXT:
                     new_context = self._compose_context(ContextType.TEXT, reply.content, **context.kwargs)
                     if new_context:
-                        reply = self._generate_reply(new_context)
+                        reply,_ = self._generate_reply(new_context)
                     else:
                         return
             elif context.type == ContextType.IMAGE:  # 图片消息，当前仅做下载保存到本地的逻辑
@@ -212,7 +222,7 @@ class ChatChannel(Channel):
             else:
                 logger.error("[WX] unknown context type: {}".format(context.type))
                 return
-        return reply
+        return reply,user_voice2text_reply
 
     def _decorate_reply(self, context: Context, reply: Reply) -> Reply:
         if reply and reply.type:
